@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>M5 HUB — Operator Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="grain"></div>
+
+  <header class="top-bar">
+    <div class="brand">
+      <span class="brand-mark">M5</span>
+      <span class="brand-divider">·</span>
+      <span class="brand-name">HUB</span>
+      <span class="brand-sub">Operator Console</span>
+    </div>
+    <div class="top-meta">
+      <div class="meta-cell" id="meta-conn">
+        <span class="meta-label">LINK</span>
+        <span class="meta-value">
+          <span class="status-dot" id="conn-dot"></span>
+          <span id="conn-text">SCANNING</span>
+        </span>
+      </div>
+      <div class="meta-cell">
+        <span class="meta-label">QUEUE</span>
+        <span class="meta-value mono" id="queue-text">0</span>
+      </div>
+      <div class="meta-cell">
+        <span class="meta-label">GATES</span>
+        <span class="meta-value mono" id="gates-count">—</span>
+      </div>
+      <div class="meta-cell">
+        <span class="meta-label">UTC</span>
+        <span class="meta-value mono" id="clock">--:--:--</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <section class="workspace-main">
+
+      <!-- STATUS BLOCK -->
+      <section class="block" id="block-status">
+        <div class="block-head">
+          <span class="block-index">01</span>
+          <h2 class="block-title">Field Status</h2>
+          <span class="block-meta mono" id="device-addr">—</span>
+        </div>
+        <div class="status-grid">
+          <article class="status-card status-card-hero">
+            <div class="status-card-label">LINK STATE</div>
+            <div class="status-card-value" id="hero-status">OFFLINE</div>
+            <div class="status-card-foot mono" id="hero-uptime">Last seen never</div>
+          </article>
+          <article class="status-card">
+            <div class="status-card-label">BATTERY</div>
+            <div class="status-card-value-small"><span id="stat-bat">—</span><span class="unit">%</span></div>
+            <div class="bar"><span class="bar-fill" id="bar-bat"></span></div>
+          </article>
+          <article class="status-card">
+            <div class="status-card-label">CPU</div>
+            <div class="status-card-value-small"><span id="stat-cpu">—</span><span class="unit">%</span></div>
+            <div class="bar"><span class="bar-fill bar-cpu" id="bar-cpu"></span></div>
+          </article>
+          <article class="status-card">
+            <div class="status-card-label">RAM</div>
+            <div class="status-card-value-small"><span id="stat-ram">—</span><span class="unit">%</span></div>
+            <div class="bar"><span class="bar-fill bar-ram" id="bar-ram"></span></div>
+          </article>
+        </div>
+      </section>
+
+      <!-- PERMISSION GATES -->
+      <section class="block" id="block-gates">
+        <div class="block-head">
+          <span class="block-index">02</span>
+          <h2 class="block-title">Permission Gates</h2>
+          <span class="block-meta mono">Claude Code · pre-tool hook</span>
+        </div>
+
+        <article class="gate-pending" id="gate-pending" hidden>
+          <header class="gate-pending-head">
+            <span class="pulse-dot"></span>
+            <span class="gate-pending-label">PENDING REQUEST</span>
+            <span class="gate-pending-timer mono" id="gate-timer">--s</span>
+          </header>
+          <h3 class="gate-pending-tool" id="gate-tool">—</h3>
+          <p class="gate-pending-detail mono" id="gate-detail">—</p>
+          <p class="gate-pending-hint">Decide on the M5 device.</p>
+        </article>
+
+        <ol class="gate-log" id="gate-log">
+          <li class="gate-log-empty">No gates recorded yet.</li>
+        </ol>
+      </section>
+
+      <!-- DEVICE PREVIEW + TEST NOTIFICATION -->
+      <section class="block" id="block-test">
+        <div class="block-head">
+          <span class="block-index">03</span>
+          <h2 class="block-title">Notification Lab</h2>
+          <span class="block-meta mono">Live preview · 240×135</span>
+        </div>
+        <div class="test-split">
+          <form class="test-form" id="test-form">
+            <label class="field">
+              <span class="field-label">Title</span>
+              <input type="text" id="t_title" value="Claude Code" maxlength="20">
+            </label>
+            <label class="field">
+              <span class="field-label">Body</span>
+              <textarea id="t_body" rows="3" maxlength="120">Pre-tool gate check for Edit operation on src/main.cpp</textarea>
+            </label>
+            <div class="field-row">
+              <label class="field">
+                <span class="field-label">Header color</span>
+                <select id="t_color">
+                  <option value="cyan">cyan</option>
+                  <option value="red" selected>red</option>
+                  <option value="green">green</option>
+                  <option value="yellow">yellow</option>
+                  <option value="orange">orange</option>
+                  <option value="purple">purple</option>
+                </select>
+              </label>
+              <label class="field">
+                <span class="field-label">Vibrate</span>
+                <select id="t_vib">
+                  <option>off</option>
+                  <option>single</option>
+                  <option selected>double</option>
+                  <option>triple</option>
+                  <option>long</option>
+                </select>
+              </label>
+              <label class="field">
+                <span class="field-label">Beep</span>
+                <select id="t_beep">
+                  <option>off</option>
+                  <option>single</option>
+                  <option>double</option>
+                  <option>success</option>
+                  <option>error</option>
+                  <option selected>alert</option>
+                </select>
+              </label>
+            </div>
+            <label class="field">
+              <span class="field-label">Options · comma-separated · max 3</span>
+              <input type="text" id="t_opts" value="Allow,Always,Deny" maxlength="40">
+            </label>
+            <div class="form-actions">
+              <button type="button" class="btn btn-primary" id="btn-send">
+                Transmit
+                <span class="btn-shortcut mono">↵</span>
+              </button>
+              <span class="form-result mono" id="form-result"></span>
+            </div>
+          </form>
+
+          <div class="device-mockup">
+            <div class="device-frame">
+              <div class="device-screen" id="preview">
+                <header class="preview-header" id="preview-header">
+                  <span id="preview-title">Claude Code</span>
+                </header>
+                <div class="preview-body" id="preview-body">Pre-tool gate check for Edit operation on src/main.cpp</div>
+                <footer class="preview-options">
+                  <span class="preview-opt opt-tap" id="preview-opt0">Allow</span>
+                  <span class="preview-opt opt-hold" id="preview-opt1">Always</span>
+                  <span class="preview-opt opt-long" id="preview-opt2">Deny</span>
+                </footer>
+              </div>
+              <div class="device-button-a"></div>
+              <div class="device-button-b"></div>
+              <div class="device-pwr"></div>
+              <div class="device-label mono">M5StickC · Plus2</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CONFIG -->
+      <section class="block" id="block-config">
+        <div class="block-head">
+          <span class="block-index">04</span>
+          <h2 class="block-title">Device Calibration</h2>
+          <span class="block-meta mono">Persists to NVS</span>
+        </div>
+        <form class="config-grid" id="config-form">
+          <label class="field-slider">
+            <span class="field-label">Brightness <span class="mono dim" id="brightness-val">200</span></span>
+            <input type="range" id="brightness" min="10" max="255" value="200">
+          </label>
+          <label class="field-slider">
+            <span class="field-label">Volume <span class="mono dim" id="volume-val">12</span></span>
+            <input type="range" id="volume" min="0" max="255" value="12">
+          </label>
+          <label class="field">
+            <span class="field-label">Idle timeout (ms)</span>
+            <input type="number" id="idle_ms" value="30000" min="0" step="1000">
+          </label>
+          <label class="field">
+            <span class="field-label">Idle sprite name</span>
+            <input type="text" id="idle_sprite" placeholder="e.g. claude">
+          </label>
+          <label class="field">
+            <span class="field-label">Show stats</span>
+            <select id="show_stats">
+              <option value="1">Yes</option>
+              <option value="0">No</option>
+            </select>
+          </label>
+          <div class="config-actions">
+            <button type="button" class="btn btn-primary" id="btn-save-config">Save &amp; Push</button>
+            <span class="form-result mono" id="config-result"></span>
+          </div>
+        </form>
+      </section>
+
+      <!-- SPRITES -->
+      <section class="block" id="block-sprites">
+        <div class="block-head">
+          <span class="block-index">05</span>
+          <h2 class="block-title">Sprite Vault</h2>
+          <span class="block-meta mono">4bpp · 32×32 frames · idle screen art</span>
+        </div>
+        <div class="sprite-layout">
+          <div class="sprite-gallery-wrap">
+            <div class="sprite-hint mono dim" id="sprite-hint">
+              // loading sprites...
+            </div>
+            <div class="sprite-gallery" id="sprite-gallery"></div>
+          </div>
+          <form class="sprite-form">
+            <label class="field">
+              <span class="field-label">Upload JSON</span>
+              <textarea id="sprite_json" rows="8" placeholder='{"name":"claude","frames":[{"pal":"...64hex chars...","px":"...1024hex chars..."}]}'></textarea>
+            </label>
+            <div class="form-actions">
+              <button type="button" class="btn btn-primary" id="btn-upload-sprite">Upload</button>
+              <span class="form-result mono" id="sprite-result"></span>
+            </div>
+          </form>
+        </div>
+      </section>
+
+    </section>
+
+    <!-- ACTIVITY LOG -->
+    <aside class="workspace-rail">
+      <div class="rail-head">
+        <span class="block-index">06</span>
+        <h2 class="block-title">Live Activity</h2>
+      </div>
+      <ol class="activity-log" id="activity-log">
+        <li class="activity-empty mono">awaiting events…</li>
+      </ol>
+      <footer class="rail-foot mono">
+        <span class="rail-pulse-dot"></span>
+        polling @ 1.5s
+      </footer>
+    </aside>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
