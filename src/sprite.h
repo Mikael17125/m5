@@ -13,7 +13,6 @@ void drawTabIcon    (int tab, int cx, int cy, uint16_t col);
 // Sprite upload handlers (called from BLE cmd dispatch)
 void handleSprBegin    (const char *s);
 void handleSprFrameDone(const char *s);
-void handleSetIdle     (const char *s);
 
 // Sprite frame chunk-receive buffer (shared with SprCB)
 extern uint8_t sprBuffer[16384];

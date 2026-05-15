@@ -71,11 +71,6 @@ void drawBatteryIcon(int x, int y, int pct, bool charging) {
 
 void drawTabIcon(int tab, int cx, int cy, uint16_t col) {
   switch (tab) {
-    case SCR_MONITOR:
-      canvas.fillRect(cx - 5, cy + 1, 2, 4, col);
-      canvas.fillRect(cx - 1, cy - 2, 2, 7, col);
-      canvas.fillRect(cx + 3, cy - 4, 2, 9, col);
-      break;
     case SCR_INBOX:
       canvas.drawRect(cx - 6, cy - 4, 12, 9, col);
       canvas.drawLine(cx - 6, cy - 4, cx, cy + 1, col);
@@ -142,6 +137,4 @@ void handleSprFrameDone(const char *s) {
   }
 }
 
-void handleSetIdle(const char *s) {
-  jsonStr(s, "\"name\"", idleSpriteName, sizeof(idleSpriteName));
-}
+

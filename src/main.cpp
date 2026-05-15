@@ -1,6 +1,7 @@
 #include "state.h"
 #include "ble.h"
 #include "ui.h"
+#include "sprite.h"
 #include <Arduino.h>
 
 void setup() {
@@ -13,11 +14,11 @@ void setup() {
   StickCP2.begin(cfg_m5);
   Serial.printf("[boot] M5 board=%d (PLUS2=%d)\n", (int)M5.getBoard(), (int)m5::board_t::board_M5StickCPlus2);
 
-  StickCP2.Display.setRotation(3);
+  StickCP2.Display.setRotation(0);
   loadSettings();
   StickCP2.Display.setBrightness(cfg.brightness);
   StickCP2.Speaker.setVolume(cfg.volume);
-  canvas.createSprite(240, 135);
+  canvas.createSprite(135, 240);
   StickCP2.Power.setLed(0);
   idleTimer = millis();
   Serial.println("[boot] m5 ok, BLE next");
@@ -52,7 +53,7 @@ void loop() {
   }
 
   // Periodically refresh local M5 battery
-  if (now - lastStatusBarMs > BAR_REFRESH_MS) {
+  if (now - lastStatusBarMs > 2000) {
     lastStatusBarMs = now;
     int b  = StickCP2.Power.getBatteryLevel();
     bool c = StickCP2.Power.isCharging();
@@ -63,6 +64,8 @@ void loop() {
     }
   }
 
+
+
   handleInput();
 
   // Idle transition from tab-root screens
@@ -70,6 +73,15 @@ void loop() {
     prevTab = current;
     current = SCR_IDLE;
     dirty = true;
+  }
+
+  // Avatar lifecycle: start/stop avatar background tasks
+  if (avatarActive && current != SCR_IDLE) {
+    stopIdleAvatar();
+    dirty = true;
+  }
+  if (current == SCR_IDLE && !avatarActive) {
+    startIdleAvatar();
   }
 
   // Render only when dirty OR screen animates (frame-capped)

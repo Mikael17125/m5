@@ -3,7 +3,7 @@
 
 LGFX_Sprite canvas(&StickCP2.Display);
 Preferences prefs;
-Config      cfg = { 200, 80, 30000, true, true };
+Config      cfg = { 200, 80, 30000, true };
 
 Notification notif = {};
 bool         notifReady = false;
@@ -14,15 +14,11 @@ uint8_t    inboxCount = 0;
 
 Sprite sprites[MAX_SPRITES];
 int    spriteCount = 0;
-char   idleSpriteName[16] = "";
 
 bool connected = false;
-bool hasData   = false;
-bool isCharg   = false;
-int  batPct = 0, cpuPct = 0, ramPct = 0;
 
-Screen  current = SCR_MONITOR;
-Screen  prevTab = SCR_MONITOR;
+Screen  current = SCR_INBOX;
+Screen  prevTab = SCR_INBOX;
 UIState ui[TAB_COUNT] = {};
 
 uint32_t idleTimer   = 0;
@@ -62,6 +58,7 @@ void loadSettings() {
   cfg.brightness = prefs.getUChar("bright", cfg.brightness);
   cfg.volume     = prefs.getUChar("vol",    cfg.volume);
   cfg.idle_ms    = prefs.getUInt ("idle",   cfg.idle_ms);
+  
   cfg.vibEnabled = prefs.getBool ("vib",    cfg.vibEnabled);
   prefs.end();
 }

@@ -60,12 +60,7 @@ void sendAction(const char *code) {
 
 // ── CMD handlers ────────────────────────────────────────────────────────────
 static void handleStats(const char *s) {
-  batPct  = jsonInt(s, "\"bat\":");
-  isCharg = jsonInt(s, "\"plug\":") == 1;
-  cpuPct  = jsonInt(s, "\"cpu\":");
-  ramPct  = jsonInt(s, "\"ram\":");
-  hasData = true;
-  if (current == SCR_MONITOR) dirty = true;
+  // No-op - monitor screen removed, stats still parsed but not displayed
 }
 
 static void handleNotify(const char *s) {
@@ -110,7 +105,7 @@ static void handleNotify(const char *s) {
 
   pushInbox(notif);
 
-  if (current != SCR_NOTIFY) prevTab = (current < TAB_COUNT) ? current : SCR_MONITOR;
+  if (current != SCR_NOTIFY) prevTab = (current < TAB_COUNT) ? current : SCR_INBOX;
   current = SCR_NOTIFY;
   idleTimer = millis();
   doVib(notif.vibPat);
@@ -137,8 +132,12 @@ static void handleConfig(const char *s) {
   }
   int im = jsonInt(s, "\"idle_ms\":");
   if (im > 0) cfg.idle_ms = im;
-  int ss = jsonInt(s, "\"show_stats\":");
-  cfg.show_stats = (ss != 0);
+  int vol = jsonInt(s, "\"vol\":");
+  if (vol > 0) { cfg.volume = constrain(vol, 0, 255); StickCP2.Speaker.setVolume(cfg.volume); }
+  saveSettings();
+}
+  int im = jsonInt(s, "\"idle_ms\":");
+  if (im > 0) cfg.idle_ms = im;
   int vol = jsonInt(s, "\"vol\":");
   if (vol > 0) { cfg.volume = constrain(vol, 0, 255); StickCP2.Speaker.setVolume(cfg.volume); }
   saveSettings();
@@ -146,15 +145,13 @@ static void handleConfig(const char *s) {
 
 void dispatchCmd(const char *s) {
   char t[8]; jsonStr(s, "\"t\"", t, sizeof(t));
-  // Idle is preempted only by genuine notifications. Stats / config / sprite
-  // uploads happen silently while the device sleeps the screen.
+  // Stats / config / sprite uploads happen silently while the device is idle.
   if      (strcmp(t, "s")    == 0) handleStats(s);
   else if (strcmp(t, "n")    == 0) { idleTimer = millis(); handleNotify(s); dirty = true; }
   else if (strcmp(t, "d")    == 0) { handleDismiss(s); dirty = true; }
   else if (strcmp(t, "cfg")  == 0) { handleConfig(s); if (current != SCR_IDLE) dirty = true; }
   else if (strcmp(t, "spb")  == 0) handleSprBegin(s);
   else if (strcmp(t, "spf")  == 0) { handleSprFrameDone(s); if (current != SCR_IDLE) dirty = true; }
-  else if (strcmp(t, "idle") == 0) handleSetIdle(s);
 }
 
 // ── Server / characteristic callbacks ───────────────────────────────────────
@@ -166,7 +163,6 @@ class ServerCB : public BLEServerCallbacks {
   }
   void onDisconnect(BLEServer *) override {
     connected = false;
-    hasData   = false;
     if (current == SCR_NOTIFY) {
       notif.pending = false;
       notifReady    = false;

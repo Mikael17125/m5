@@ -24,9 +24,8 @@
 
 // ── Timing constants ────────────────────────────────────────────────────────
 #define DOUBLE_TAP_MS  400
-#define LONG_PRESS_MS  2000
+#define LONG_PRESS_MS  800
 #define MIN_FRAME_MS   80
-#define BAR_REFRESH_MS 2000
 
 // ── Sizes ───────────────────────────────────────────────────────────────────
 #define MAX_SPRITES 8
@@ -34,8 +33,7 @@
 
 // ── Screen state ────────────────────────────────────────────────────────────
 enum Screen {
-  SCR_MONITOR = 0,
-  SCR_INBOX,
+  SCR_INBOX = 0,
   SCR_ACTIONS,
   SCR_SETTINGS,
   TAB_COUNT,
@@ -55,7 +53,6 @@ struct Config {
   uint8_t  volume;
   uint8_t  brightness;
   uint32_t idle_ms;
-  bool     show_stats;
   bool     vibEnabled;
 };
 
@@ -83,7 +80,7 @@ struct InboxEntry {
   uint32_t timestamp;
 };
 
-// ── Sprite ──────────────────────────────────────────────────────────────────
+// ── Sprite (pushed on-demand via BLE, never stored permanently) ─────────────
 struct Sprite {
   char    name[16];
   uint8_t frameCount, w, h;
@@ -110,10 +107,9 @@ extern InboxEntry  inbox[INBOX_CAP];
 extern uint8_t     inboxHead, inboxCount;
 extern Sprite      sprites[MAX_SPRITES];
 extern int         spriteCount;
-extern char        idleSpriteName[16];
-
-extern bool connected, hasData, isCharg;
-extern int  batPct, cpuPct, ramPct;
+extern bool connected;
+extern int  m5Bat;
+extern bool     m5Charging;
 
 extern Screen   current, prevTab;
 extern UIState  ui[TAB_COUNT];
@@ -127,8 +123,6 @@ extern uint32_t actionFlashUntil;
 
 extern bool     dirty;
 extern uint32_t lastRenderMs, lastStatusBarMs;
-extern int      m5Bat;
-extern bool     m5Charging;
 
 extern class BLECharacteristic *evtChar;
 

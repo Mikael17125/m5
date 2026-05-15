@@ -2,6 +2,8 @@
 import json, sys, urllib.request, urllib.error
 from pathlib import Path
 
+HERE = Path(__file__).resolve().parent
+
 DAEMON_URL   = "http://127.0.0.1:7355"
 USER_TIMEOUT = 75
 
@@ -36,7 +38,7 @@ def call_daemon(tool, detail):
         print("[ble_gate] Daemon not reachable, failing open", file=sys.stderr)
         return "error"
 
-SETTINGS_PATH = Path.home() / ".claude" / "settings.json"
+SETTINGS_PATH = HERE / "claude_settings.json"
 
 def is_always_allowed(tool):
     try:

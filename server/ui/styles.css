@@ -433,6 +433,55 @@ a:hover { text-decoration: underline; }
 }
 .gate-pending-hint::before { content: "// "; color: var(--fg-4); }
 
+.gate-pending-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--rule-soft);
+}
+
+.gate-btn {
+  flex: 1;
+  padding: 10px 12px;
+  background: var(--bg-2);
+  color: var(--fg-0);
+  border: 1px solid var(--rule-soft);
+  border-radius: 0;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.12s;
+  letter-spacing: 0;
+  text-transform: lowercase;
+}
+.gate-btn:hover {
+  background: var(--bg-3);
+  border-color: var(--syn-blue);
+}
+.gate-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+  pointer-events: none;
+}
+.gate-btn-always {
+  color: var(--syn-cyan);
+  border-color: var(--syn-cyan);
+}
+.gate-btn-always:hover {
+  background: var(--syn-cyan);
+  color: var(--bg-0);
+}
+.gate-btn-deny {
+  color: var(--syn-red);
+  border-color: var(--syn-red);
+}
+.gate-btn-deny:hover {
+  background: var(--syn-red);
+  color: var(--bg-0);
+}
+
 .gate-log {
   list-style: none;
   border: 1px solid var(--rule);
@@ -627,6 +676,169 @@ a:hover { text-decoration: underline; }
   cursor: pointer;
 }
 
+/* ─── COMPOSER EXTENSIONS ──────────────────────────────────────────────────── */
+
+.composer-mode-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.mode-btn {
+  padding: 6px 16px;
+  background: transparent;
+  border: 1px solid var(--rule-soft);
+  color: var(--fg-2);
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  text-transform: lowercase;
+  letter-spacing: 0;
+  transition: all 0.15s;
+}
+
+.mode-btn:first-child {
+  border-right: none;
+}
+
+.mode-btn:hover {
+  color: var(--fg-0);
+  background: var(--bg-2);
+}
+
+.mode-btn.active {
+  background: rgba(229, 192, 123, 0.1);
+  border-color: var(--syn-yellow);
+  color: var(--syn-yellow);
+}
+
+.mode-hint {
+  margin-left: 12px;
+  font-size: 10px;
+}
+
+/* Field with character counter */
+.field-with-counter .field-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.field-with-counter .field-label-row .field-label {
+  /* keep existing label styles */
+}
+
+.char-counter {
+  font-size: 10px;
+  color: var(--fg-4);
+  letter-spacing: 0;
+  transition: color 0.15s;
+}
+
+.char-counter.at-max {
+  color: var(--syn-red);
+  font-weight: 700;
+}
+
+/* Color Swatches */
+.swatch-row {
+  display: flex;
+  gap: 8px;
+  padding: 6px 0;
+}
+
+.swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--sw);
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+  padding: 0;
+  outline: none;
+  position: relative;
+}
+
+.swatch:hover {
+  transform: scale(1.25);
+}
+
+.swatch.active {
+  border-color: #fff;
+  box-shadow: 0 0 0 1px var(--bg-0), 0 0 6px rgba(255, 255, 255, 0.15);
+}
+
+.swatch.active::after {
+  content: attr(data-color);
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 6px;
+  font-family: var(--font);
+  font-size: 8px;
+  color: var(--fg-3);
+  text-transform: lowercase;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* LED Toggle Switch */
+.toggle-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-wrap input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-track {
+  position: relative;
+  width: 28px;
+  height: 14px;
+  background: var(--bg-3);
+  border: 1px solid var(--rule-soft);
+  transition: background 0.2s, border-color 0.2s;
+  flex-shrink: 0;
+}
+
+.toggle-thumb {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 10px;
+  height: 10px;
+  background: var(--fg-4);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background 0.2s;
+}
+
+.toggle-wrap input:checked + .toggle-track {
+  background: var(--syn-green);
+  border-color: var(--syn-green);
+}
+
+.toggle-wrap input:checked + .toggle-track .toggle-thumb {
+  transform: translateX(14px);
+  background: var(--bg-0);
+}
+
+.toggle-label {
+  font-size: 11px;
+  color: var(--fg-2);
+  letter-spacing: 0;
+}
+
 /* ─── BUTTONS ─────────────────────────────────────────────────────────────── */
 .btn {
   display: inline-flex;
@@ -782,6 +994,46 @@ a:hover { text-decoration: underline; }
 .preview-opt.opt-tap::before  { content: "tap: ";  color: #5c6370; }
 .preview-opt.opt-hold::before { content: "x2:  ";  color: #5c6370; }
 .preview-opt.opt-long::before { content: "hold:";  color: #5c6370; }
+
+/* ─── PREVIEW ENHANCEMENTS ─────────────────────────────────────────────────── */
+.preview-header {
+  transition: background 0.2s;
+}
+
+.preview-header::after {
+  color: rgba(0, 0, 0, 0.35);
+}
+
+.preview-sprite-badge {
+  margin-left: 6px;
+  font-size: 8px;
+  font-weight: 400;
+  color: rgba(0, 0, 0, 0.6);
+  padding: 1px 4px;
+  background: rgba(0, 0, 0, 0.15);
+  letter-spacing: 0;
+  display: none;
+}
+
+.preview-sprite-badge:not(:empty) {
+  display: inline;
+}
+
+.preview-timeout {
+  position: absolute;
+  top: 28px;
+  right: 3px;
+  font-size: 7px;
+  color: #5c6370;
+  letter-spacing: 0;
+  pointer-events: none;
+}
+
+.preview-timeout::before {
+  content: "⏱";
+  margin-right: 1px;
+  font-size: 6px;
+}
 
 .device-button-a {
   position: absolute;

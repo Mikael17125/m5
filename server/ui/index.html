@@ -92,7 +92,12 @@
           </header>
           <h3 class="gate-pending-tool" id="gate-tool">—</h3>
           <p class="gate-pending-detail mono" id="gate-detail">—</p>
-          <p class="gate-pending-hint">Decide on the M5 device.</p>
+          <p class="gate-pending-hint">Decide on the device or desktop.</p>
+          <div class="gate-pending-buttons">
+            <button class="btn gate-btn" data-decision="Allow">Allow</button>
+            <button class="btn gate-btn gate-btn-always" data-decision="Always">Always</button>
+            <button class="btn gate-btn gate-btn-deny" data-decision="Deny">Deny</button>
+          </div>
         </article>
 
         <ol class="gate-log" id="gate-log">
@@ -109,26 +114,56 @@
         </div>
         <div class="test-split">
           <form class="test-form" id="test-form">
-            <label class="field">
-              <span class="field-label">Title</span>
+
+            <!-- Mode Toggle -->
+            <div class="composer-mode-row">
+              <button type="button" class="mode-btn active" data-mode="notify">notify</button>
+              <button type="button" class="mode-btn" data-mode="alert">alert</button>
+              <span class="mode-hint mono dim" id="mode-hint">waits for response</span>
+            </div>
+
+            <!-- Title + Counter -->
+            <label class="field field-with-counter">
+              <div class="field-label-row">
+                <span class="field-label">Title</span>
+                <span class="char-counter mono" id="title-counter">11/20</span>
+              </div>
               <input type="text" id="t_title" value="Claude Code" maxlength="20">
             </label>
-            <label class="field">
-              <span class="field-label">Body</span>
+
+            <!-- Body + Counter -->
+            <label class="field field-with-counter">
+              <div class="field-label-row">
+                <span class="field-label">Body</span>
+                <span class="char-counter mono" id="body-counter">55/120</span>
+              </div>
               <textarea id="t_body" rows="3" maxlength="120">Pre-tool gate check for Edit operation on src/main.cpp</textarea>
             </label>
+
+            <!-- Header Color Swatches -->
+            <div class="field">
+              <span class="field-label">Header color</span>
+              <div class="swatch-row" id="swatch-row">
+                <button type="button" class="swatch active" data-color="cyan"    style="--sw:#56b6c2" title="#56b6c2"></button>
+                <button type="button" class="swatch"        data-color="red"     style="--sw:#e06c75" title="#e06c75"></button>
+                <button type="button" class="swatch"        data-color="green"   style="--sw:#98c379" title="#98c379"></button>
+                <button type="button" class="swatch"        data-color="yellow"  style="--sw:#e5c07b" title="#e5c07b"></button>
+                <button type="button" class="swatch"        data-color="orange"  style="--sw:#d19a66" title="#d19a66"></button>
+                <button type="button" class="swatch"        data-color="purple"  style="--sw:#c678dd" title="#c678dd"></button>
+              </div>
+              <input type="hidden" id="t_color" value="cyan">
+            </div>
+
+            <!-- Sprite Picker -->
+            <label class="field">
+              <span class="field-label">Sprite</span>
+              <select id="t_sprite">
+                <option value="">None</option>
+              </select>
+            </label>
+
+            <!-- Vibrate / Beep / LED -->
             <div class="field-row">
-              <label class="field">
-                <span class="field-label">Header color</span>
-                <select id="t_color">
-                  <option value="cyan">cyan</option>
-                  <option value="red" selected>red</option>
-                  <option value="green">green</option>
-                  <option value="yellow">yellow</option>
-                  <option value="orange">orange</option>
-                  <option value="purple">purple</option>
-                </select>
-              </label>
               <label class="field">
                 <span class="field-label">Vibrate</span>
                 <select id="t_vib">
@@ -150,16 +185,38 @@
                   <option selected>alert</option>
                 </select>
               </label>
+              <div class="field">
+                <span class="field-label">LED</span>
+                <label class="toggle-wrap">
+                  <input type="checkbox" id="t_led" checked>
+                  <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                  <span class="toggle-label mono" id="led-label">on</span>
+                </label>
+              </div>
             </div>
-            <label class="field">
-              <span class="field-label">Options · comma-separated · max 3</span>
-              <input type="text" id="t_opts" value="Allow,Always,Deny" maxlength="40">
+
+            <!-- Timeout Slider -->
+            <label class="field-slider">
+              <span class="field-label">Timeout <span class="mono dim" id="timeout-val">60</span>s</span>
+              <input type="range" id="t_timeout" min="5" max="120" value="60">
             </label>
+
+            <!-- Options + Counter -->
+            <div class="field field-with-counter" id="opts-field">
+              <div class="field-label-row">
+                <span class="field-label">Options · comma-separated</span>
+                <span class="char-counter mono" id="opts-counter">3/3 options</span>
+              </div>
+              <input type="text" id="t_opts" value="Allow,Always,Deny" maxlength="40">
+            </div>
+
+            <!-- Actions -->
             <div class="form-actions">
               <button type="button" class="btn btn-primary" id="btn-send">
                 Transmit
-                <span class="btn-shortcut mono">↵</span>
+                <span class="btn-shortcut mono">⌃↵</span>
               </button>
+              <button type="button" class="btn" id="btn-clear">Clear</button>
               <span class="form-result mono" id="form-result"></span>
             </div>
           </form>
@@ -167,15 +224,17 @@
           <div class="device-mockup">
             <div class="device-frame">
               <div class="device-screen" id="preview">
-                <header class="preview-header" id="preview-header">
+                <header class="preview-header" id="preview-header" data-color="cyan">
                   <span id="preview-title">Claude Code</span>
+                  <span class="preview-sprite-badge" id="preview-sprite"></span>
                 </header>
                 <div class="preview-body" id="preview-body">Pre-tool gate check for Edit operation on src/main.cpp</div>
-                <footer class="preview-options">
-                  <span class="preview-opt opt-tap" id="preview-opt0">Allow</span>
+                <footer class="preview-options" id="preview-options">
+                  <span class="preview-opt opt-tap"  id="preview-opt0">Allow</span>
                   <span class="preview-opt opt-hold" id="preview-opt1">Always</span>
                   <span class="preview-opt opt-long" id="preview-opt2">Deny</span>
                 </footer>
+                <div class="preview-timeout mono" id="preview-timeout">60s</div>
               </div>
               <div class="device-button-a"></div>
               <div class="device-button-b"></div>
@@ -206,17 +265,6 @@
             <span class="field-label">Idle timeout (ms)</span>
             <input type="number" id="idle_ms" value="30000" min="0" step="1000">
           </label>
-          <label class="field">
-            <span class="field-label">Idle sprite name</span>
-            <input type="text" id="idle_sprite" placeholder="e.g. claude">
-          </label>
-          <label class="field">
-            <span class="field-label">Show stats</span>
-            <select id="show_stats">
-              <option value="1">Yes</option>
-              <option value="0">No</option>
-            </select>
-          </label>
           <div class="config-actions">
             <button type="button" class="btn btn-primary" id="btn-save-config">Save &amp; Push</button>
             <span class="form-result mono" id="config-result"></span>
@@ -224,49 +272,32 @@
         </form>
       </section>
 
-      <!-- SPRITES -->
-      <section class="block" id="block-sprites">
-        <div class="block-head">
-          <span class="block-index">05</span>
-          <h2 class="block-title">Sprite Vault</h2>
-          <span class="block-meta mono">4bpp · 32×32 frames · idle screen art</span>
-        </div>
-        <div class="sprite-layout">
-          <div class="sprite-gallery-wrap">
-            <div class="sprite-hint mono dim" id="sprite-hint">
-              // loading sprites...
-            </div>
-            <div class="sprite-gallery" id="sprite-gallery"></div>
-          </div>
-          <form class="sprite-form">
-            <label class="field">
-              <span class="field-label">Upload JSON</span>
-              <textarea id="sprite_json" rows="8" placeholder='{"name":"claude","frames":[{"pal":"...64hex chars...","px":"...1024hex chars..."}]}'></textarea>
-            </label>
-            <div class="form-actions">
-              <button type="button" class="btn btn-primary" id="btn-upload-sprite">Upload</button>
-              <span class="form-result mono" id="sprite-result"></span>
-            </div>
-          </form>
-        </div>
-      </section>
+
 
     </section>
 
-    <!-- ACTIVITY LOG -->
+    <!-- RIGHT SIDEBAR -->
     <aside class="workspace-rail">
       <div class="rail-head">
         <span class="block-index">06</span>
-        <h2 class="block-title">Live Activity</h2>
+        <span class="block-title">Activity</span>
       </div>
       <ol class="activity-log" id="activity-log">
         <li class="activity-empty mono">awaiting events…</li>
       </ol>
-      <footer class="rail-foot mono">
+      <div class="rail-head" style="border-top:1px solid var(--rule)">
+        <span class="block-index">07</span>
+        <span class="block-title">Notifications</span>
+      </div>
+      <ol class="activity-log" id="notify-log">
+        <li class="activity-empty mono">awaiting notifications…</li>
+      </ol>
+      <div class="rail-foot">
         <span class="rail-pulse-dot"></span>
-        polling @ 1.5s
-      </footer>
+        <span id="notify-count">0 entries</span>
+      </div>
     </aside>
+
   </main>
 
   <script src="app.js"></script>

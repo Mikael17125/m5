@@ -1,6 +1,5 @@
 /* ───────────────────────────────────────────────────────────────────────────
-   M5 HUB — Operator Console
-   Vanilla JS controller. Polls /api/status, /api/activity, /api/gates.
+   M5 HUB — Operator Console (Minimal)
    ─────────────────────────────────────────────────────────────────────────── */
 
 const POLL_MS = 1500;
@@ -9,15 +8,21 @@ const CLOCK_MS = 1000;
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
 
-// IDE theme: preview header uses a single accent regardless of selected color.
-// The selected color is transmitted to the device for real BLE notification.
-const HEADER_COLOR_MAP = null;
-
 let lastActivityIds = new Set();
+let lastNotifyIds = new Set();
 let connectedSince = null;
+let configFormInitialized = false;
+
+const COLOR_MAP = {
+  cyan: '#56b6c2', red: '#e06c75', green: '#98c379',
+  yellow: '#e5c07b', orange: '#d19a66', purple: '#c678dd'
+};
+let composerMode = 'notify';
+let lastSprites = [];
 
 /* ─── BOOT ─────────────────────────────────────────────────────────────────── */
 function boot() {
+  initComposer();
   bindForms();
   tickClock();
   setInterval(tickClock, CLOCK_MS);
@@ -36,20 +41,22 @@ function tickClock() {
 
 /* ─── POLLING ──────────────────────────────────────────────────────────────── */
 async function poll() {
-  const [status, activity, gates, config] = await Promise.all([
+  const [status, activity, notifications, gates, config] = await Promise.all([
     fetch("/api/status").then(safe).catch(() => null),
     fetch("/api/activity").then(safe).catch(() => null),
+    fetch("/api/notifications").then(safe).catch(() => null),
     fetch("/api/gates").then(safe).catch(() => null),
     fetch("/api/config").then(safe).catch(() => null),
   ]);
-  if (status)   renderStatus(status);
-  if (activity) renderActivity(activity);
-  if (gates)    renderGates(gates);
+  if (status)        renderStatus(status);
+  if (activity)      renderActivity(activity);
+  if (notifications) renderNotifyLog(notifications);
+  if (gates)         renderGates(gates);
   if (config && !configFormInitialized) {
     populateConfigForm(config);
     configFormInitialized = true;
   }
-  if (config) renderSprites(config);
+  if (config) populateSpritePicker(config.sprites || {});
 }
 
 async function safe(r) {
@@ -60,30 +67,21 @@ async function safe(r) {
 /* ─── STATUS RENDER ────────────────────────────────────────────────────────── */
 function renderStatus(s) {
   const connected = !!s.connected;
-
-  // top bar dot + text
   const dot = $("#conn-dot");
   dot.classList.toggle("on", connected);
   $("#conn-text").textContent = connected ? "ACTIVE" : "OFFLINE";
-
   $("#queue-text").textContent = String(s.queue_depth ?? 0);
   $("#gates-count").textContent = String(s.gates_total ?? "—");
-
-  // hero
   const hero = $("#hero-status");
   hero.textContent = connected ? "CONNECTED" : "OFFLINE";
   hero.classList.toggle("live", connected);
   hero.classList.toggle("off", !connected);
-
   if (connected && !connectedSince) connectedSince = Date.now();
   if (!connected) connectedSince = null;
   $("#hero-uptime").textContent = connected
     ? `Linked · uptime ${formatUptime(Date.now() - connectedSince)}`
     : "Awaiting BLE beacon";
-
   $("#device-addr").textContent = s.device || "—";
-
-  // stats
   const bat = s.stats?.bat ?? 0;
   const cpu = s.stats?.cpu ?? 0;
   const ram = s.stats?.ram ?? 0;
@@ -93,8 +91,6 @@ function renderStatus(s) {
   $("#bar-bat").style.width = `${clamp(bat)}%`;
   $("#bar-cpu").style.width = `${clamp(cpu)}%`;
   $("#bar-ram").style.width = `${clamp(ram)}%`;
-
-  // pending gate (if any in status payload)
   renderPending(s.pending_gate);
 }
 
@@ -110,15 +106,45 @@ function formatUptime(ms) {
 }
 
 /* ─── PENDING GATE ─────────────────────────────────────────────────────────── */
+let pendingGateId = null;
+let gateResponding = false;
+
 function renderPending(p) {
   const el = $("#gate-pending");
-  if (!p) { el.hidden = true; return; }
+  if (!p) {
+    el.hidden = true;
+    pendingGateId = null;
+    return;
+  }
   el.hidden = false;
+  pendingGateId = p.id;
   $("#gate-tool").textContent = p.tool || "Unknown";
   $("#gate-detail").textContent = p.detail || "";
   const remaining = Math.max(0, Math.round((p.deadline_ms - Date.now()) / 1000));
   $("#gate-timer").textContent = `${remaining}s`;
+  $$(".gate-btn").forEach(btn => btn.disabled = gateResponding);
 }
+
+async function respondGate(decision) {
+  if (!pendingGateId || gateResponding) return;
+  gateResponding = true;
+  $$(".gate-btn").forEach(btn => btn.disabled = true);
+  try {
+    await fetch("/api/gate/respond", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decision }),
+    });
+  } catch (e) {
+    console.error("gate respond failed:", e);
+  }
+  gateResponding = false;
+}
+
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest(".gate-btn");
+  if (btn && !btn.disabled) respondGate(btn.dataset.decision);
+});
 
 /* ─── GATES LOG ────────────────────────────────────────────────────────────── */
 function renderGates(g) {
@@ -136,7 +162,7 @@ function renderGates(g) {
       <li class="gate-row">
         <span class="gate-row-ts">${escapeHtml(ts)}</span>
         <div class="gate-row-body">
-          <span class="gate-row-tool">${escapeHtml(it.tool)}</span>
+          <span class="gate-row-tool">${escapeHtml(it.tool || "")}</span>
           <span class="gate-row-detail" title="${escapeAttr(it.detail || "")}">${escapeHtml(it.detail || "")}</span>
         </div>
         <span class="gate-row-decision ${cls}">${dec}</span>
@@ -173,6 +199,37 @@ function renderActivity(a) {
   lastActivityIds = newIds;
 }
 
+/* ─── NOTIFICATION LOG (SIDEBAR) ─────────────────────────────────────────── */
+function renderNotifyLog(n) {
+  const log = $("#notify-log");
+  const items = n.items || [];
+  $("#notify-count").textContent = `${items.length} entries`;
+  if (!items.length) {
+    log.innerHTML = '<li class="activity-empty mono">awaiting notifications…</li>';
+    lastNotifyIds = new Set();
+    return;
+  }
+  const newIds = new Set();
+  const html = items.map((it) => {
+    newIds.add(it.id);
+    const fresh = lastNotifyIds.size && !lastNotifyIds.has(it.id);
+    const ts = formatTimestamp(it.ts, true);
+    const statusCls = it.status === "alert" ? " kind-alert" :
+                      it.status === "sprite_test" ? " kind-sprite" : "";
+    return `
+      <li class="activity-row${fresh ? " fresh" : ""}${statusCls}" data-id="${escapeAttr(it.id)}">
+        <span class="activity-ts">${escapeHtml(ts)}</span>
+        <div class="activity-content">
+          <span class="activity-kind kind-notify">NOTIFY</span>
+          <span class="activity-msg"><strong>${escapeHtml(it.title || "")}</strong> · ${escapeHtml(it.body || "")}</span>
+        </div>
+      </li>
+    `;
+  }).join("");
+  log.innerHTML = html;
+  lastNotifyIds = newIds;
+}
+
 function formatActivityMsg(it) {
   if (it.kind === "gate") {
     const dec = it.decision ? ` → <strong>${escapeHtml(it.decision.toUpperCase())}</strong>` : "";
@@ -194,22 +251,101 @@ function formatTimestamp(ts, withSeconds = false) {
   return `${h}:${m}:${s}`;
 }
 
-/* ─── TEST NOTIFICATION ────────────────────────────────────────────────────── */
+/* ─── TEST NOTIFICATION (COMPOSER) ─────────────────────────────────────────── */
 function bindForms() {
-  // live preview
-  const fields = ["t_title", "t_body", "t_color", "t_opts"];
-  fields.forEach((id) => $("#" + id).addEventListener("input", updatePreview));
-  updatePreview();
-
-  $("#btn-send").addEventListener("click", sendTestNotify);
-  $("#test-form").addEventListener("submit", (e) => { e.preventDefault(); sendTestNotify(); });
-
-  // sliders show live value
   bindSlider("brightness", "brightness-val");
   bindSlider("volume", "volume-val");
-
   $("#btn-save-config").addEventListener("click", saveConfig);
-  $("#btn-upload-sprite").addEventListener("click", uploadSprite);
+
+}
+
+function initComposer() {
+  const titleEl = $("#t_title");
+  const bodyEl  = $("#t_body");
+  const optsEl  = $("#t_opts");
+
+  /* initial counters */
+  updateCharCounter("title-counter", titleEl.value.length, 20);
+  updateCharCounter("body-counter", bodyEl.value.length, 120);
+  updateOptsCounter();
+
+  /* live counters */
+  titleEl.addEventListener("input", () => {
+    updateCharCounter("title-counter", titleEl.value.length, 20);
+    updatePreview();
+  });
+  bodyEl.addEventListener("input", () => {
+    updateCharCounter("body-counter", bodyEl.value.length, 120);
+    updatePreview();
+  });
+  optsEl.addEventListener("input", () => {
+    updateOptsCounter();
+    updatePreview();
+  });
+
+  /* color swatches */
+  $$(".swatch").forEach(sw => {
+    sw.addEventListener("click", () => {
+      $$(".swatch").forEach(s => s.classList.remove("active"));
+      sw.classList.add("active");
+      $("#t_color").value = sw.dataset.color;
+      updatePreview();
+    });
+  });
+
+  /* mode toggle */
+  $$(".mode-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      $$(".mode-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      composerMode = btn.dataset.mode;
+      $("#mode-hint").textContent = composerMode === "notify"
+        ? "waits for response" : "fire-and-forget";
+      const optsField = $("#opts-field");
+      const timeout = $("#t_timeout");
+      if (composerMode === "alert") {
+        optsField.style.display = "none";
+        timeout.value = 10;
+      } else {
+        optsField.style.display = "";
+        timeout.value = 60;
+      }
+      $("#timeout-val").textContent = timeout.value;
+      updatePreview();
+    });
+  });
+
+  /* LED toggle label */
+  $("#t_led").addEventListener("change", () => {
+    $("#led-label").textContent = $("#t_led").checked ? "on" : "off";
+  });
+
+  /* timeout slider */
+  const timeoutSlider = $("#t_timeout");
+  timeoutSlider.addEventListener("input", () => {
+    $("#timeout-val").textContent = timeoutSlider.value;
+    updatePreview();
+  });
+
+  /* sprite / vib / beep changes */
+  $("#t_sprite").addEventListener("change", updatePreview);
+  $("#t_vib").addEventListener("change", updatePreview);
+  $("#t_beep").addEventListener("change", updatePreview);
+
+  /* buttons */
+  $("#btn-send").addEventListener("click", sendTestNotify);
+  $("#test-form").addEventListener("submit", (e) => { e.preventDefault(); sendTestNotify(); });
+  $("#btn-clear").addEventListener("click", clearComposer);
+
+  /* Ctrl+Enter shortcut */
+  document.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+      e.preventDefault();
+      sendTestNotify();
+    }
+  });
+
+  updatePreview();
 }
 
 function bindSlider(inputId, displayId) {
@@ -218,55 +354,125 @@ function bindSlider(inputId, displayId) {
   i.addEventListener("input", () => { d.textContent = i.value; });
 }
 
-function updatePreview() {
-  const title = $("#t_title").value || " ";
-  const body  = $("#t_body").value || " ";
-  const color = $("#t_color").value;
-  const opts  = $("#t_opts").value.split(",").map(s => s.trim()).filter(Boolean).slice(0, 3);
-
-  $("#preview-title").textContent = title;
-  $("#preview-body").textContent = body;
-  // header color is a device-side concern; show its name as a tag instead.
-  const hdr = $("#preview-header");
-  hdr.setAttribute("data-color", color);
-
-  const [o0, o1, o2] = opts;
-  setOpt("#preview-opt0", o0 || "OK");
-  setOpt("#preview-opt1", o1, !o1);
-  setOpt("#preview-opt2", o2, !o2);
+function updateCharCounter(id, current, max) {
+  const el = $("#" + id);
+  el.textContent = `${current}/${max}`;
+  el.classList.toggle("at-max", current >= max);
 }
 
-function setOpt(sel, text, hide) {
-  const el = $(sel);
-  el.textContent = text || "";
-  el.style.display = hide ? "none" : "block";
+function updateOptsCounter() {
+  const opts = $("#t_opts").value.split(",").map(s => s.trim()).filter(Boolean);
+  const el = $("#opts-counter");
+  el.textContent = `${opts.length}/3 options`;
+  el.classList.toggle("at-max", opts.length >= 3);
+}
+
+function updatePreview() {
+  const title   = $("#t_title").value || " ";
+  const body    = $("#t_body").value || " ";
+  const color   = $("#t_color").value;
+  const sprite  = $("#t_sprite").value;
+  const timeout = $("#t_timeout").value;
+
+  $("#preview-title").textContent = title;
+  $("#preview-body").textContent  = body;
+
+  /* header color */
+  const hdr = $("#preview-header");
+  hdr.setAttribute("data-color", color);
+  hdr.style.background = COLOR_MAP[color] || "#2c313a";
+
+  /* sprite badge */
+  const spriteBadge = $("#preview-sprite");
+  spriteBadge.textContent = sprite || "";
+  spriteBadge.style.display = sprite ? "inline" : "none";
+
+  /* timeout */
+  $("#preview-timeout").textContent = timeout + "s";
+
+  /* options */
+  const optsContainer = $("#preview-options");
+  if (composerMode === "notify") {
+    optsContainer.style.display = "";
+    const opts = $("#t_opts").value.split(",").map(s => s.trim()).filter(Boolean);
+    for (let i = 0; i < 3; i++) {
+      const el = $(`#preview-opt${i}`);
+      if (opts[i]) { el.textContent = opts[i]; el.style.display = ""; }
+      else         { el.style.display = "none"; }
+    }
+  } else {
+    optsContainer.style.display = "none";
+  }
+}
+
+function clearComposer() {
+  composerMode = "notify";
+  $$(".mode-btn").forEach(b => b.classList.toggle("active", b.dataset.mode === "notify"));
+  $("#mode-hint").textContent = "waits for response";
+  $("#opts-field").style.display = "";
+
+  $("#t_title").value = "";
+  $("#t_body").value  = "";
+  $("#t_opts").value  = "";
+  $("#t_sprite").value = "";
+  $("#t_vib").value   = "double";
+  $("#t_beep").value  = "alert";
+  $("#t_led").checked = true;
+  $("#led-label").textContent = "on";
+  $("#t_timeout").value = 60;
+  $("#timeout-val").textContent = "60";
+
+  $$(".swatch").forEach(s => s.classList.toggle("active", s.dataset.color === "cyan"));
+  $("#t_color").value = "cyan";
+
+  updateCharCounter("title-counter", 0, 20);
+  updateCharCounter("body-counter", 0, 120);
+  updateOptsCounter();
+  $("#form-result").textContent = "";
+  updatePreview();
 }
 
 async function sendTestNotify() {
   const result = $("#form-result");
-  const opts = $("#t_opts").value.split(",").map(s => s.trim()).filter(Boolean);
+  const opts = $("#t_opts").value.split(",").map(s => s.trim()).filter(Boolean).slice(0, 3);
   const body = {
-    title: $("#t_title").value,
-    body:  $("#t_body").value,
-    color: $("#t_color").value,
+    title:   $("#t_title").value,
+    body:    $("#t_body").value,
+    color:   $("#t_color").value,
     vibrate: $("#t_vib").value,
     beep:    $("#t_beep").value,
     options: opts,
-    led: true,
+    led:     $("#t_led").checked,
+    sprite:  $("#t_sprite").value || undefined,
+    timeout: parseInt($("#t_timeout").value, 10),
   };
+  const endpoint = composerMode === "alert" ? "/alert" : "/notify";
   setResult(result, "Transmitting…", "");
   try {
-    const r = await fetch("/notify", {
+    const r = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
     const d = await r.json();
-    const lbl = d.label || "—";
-    setResult(result, `choice ${d.choice ?? "?"} · ${lbl}`, "ok");
+    const msg = d.ok
+      ? "OK" + (d.choice ? " → " + d.choice : "")
+      : "Error: " + JSON.stringify(d);
+    setResult(result, msg, d.ok ? "ok" : "err");
   } catch (e) {
-    setResult(result, "Transmit failed: " + e.message, "err");
+    setResult(result, "Failed: " + e.message, "err");
   }
+}
+
+function populateSpritePicker(sprites) {
+  const sel = $("#t_sprite");
+  const names = Object.keys(sprites || {});
+  if (names.join(",") === lastSprites.join(",")) return;
+  lastSprites = names;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">None</option>' +
+    names.map(n => `<option value="${escapeAttr(n)}">${escapeHtml(n)}</option>`).join("");
+  sel.value = names.includes(current) ? current : "";
 }
 
 function setResult(el, text, cls) {
@@ -276,16 +482,13 @@ function setResult(el, text, cls) {
 }
 
 /* ─── CONFIG ───────────────────────────────────────────────────────────────── */
-let configFormInitialized = false;
-
 function populateConfigForm(c) {
   $("#brightness").value     = c.brightness ?? 200;
   $("#brightness-val").textContent = c.brightness ?? 200;
   $("#volume").value         = c.volume ?? 12;
   $("#volume-val").textContent = c.volume ?? 12;
   $("#idle_ms").value        = c.idle_ms ?? 30000;
-  $("#idle_sprite").value    = c.idle_sprite ?? "";
-  $("#show_stats").value     = c.show_stats ? "1" : "0";
+
 }
 
 async function saveConfig() {
@@ -294,8 +497,6 @@ async function saveConfig() {
     brightness:  parseInt($("#brightness").value, 10),
     volume:      parseInt($("#volume").value, 10),
     idle_ms:     parseInt($("#idle_ms").value, 10),
-    idle_sprite: $("#idle_sprite").value,
-    show_stats:  $("#show_stats").value === "1",
   };
   setResult(result, "Saving…", "");
   try {
@@ -305,208 +506,14 @@ async function saveConfig() {
       body: JSON.stringify(body),
     });
     const d = await r.json();
-    setResult(result, d.ok ? "Saved & pushed to device" : "Error: " + JSON.stringify(d), d.ok ? "ok" : "err");
+    setResult(result, d.ok ? "Saved" : "Error: " + JSON.stringify(d), d.ok ? "ok" : "err");
   } catch (e) {
     setResult(result, "Failed: " + e.message, "err");
   }
 }
 
-/* ─── SPRITE UPLOAD ────────────────────────────────────────────────────────── */
-async function uploadSprite() {
-  const result = $("#sprite-result");
-  const text = $("#sprite_json").value.trim();
-  if (!text) { setResult(result, "Paste JSON first", "err"); return; }
-  let parsed;
-  try { parsed = JSON.parse(text); }
-  catch (e) { setResult(result, "Invalid JSON: " + e.message, "err"); return; }
-  setResult(result, "Uploading…", "");
-  try {
-    const r = await fetch("/api/sprite", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(parsed),
-    });
-    const d = await r.json();
-    setResult(result, d.ok ? `Sprite '${parsed.name}' uploaded` : "Error: " + JSON.stringify(d), d.ok ? "ok" : "err");
-  } catch (e) {
-    setResult(result, "Failed: " + e.message, "err");
-  }
-}
 
-/* ─── SPRITE GALLERY ───────────────────────────────────────────────────────── */
-// Track active animation intervals by sprite name so we can clean them up
-// when sprites are re-rendered.
-const spriteTimers = new Map();
-// Cache last-rendered config to skip work when nothing changed.
-let lastSpriteConfigHash = "";
-
-function renderSprites(config) {
-  const sprites = config.sprites || {};
-  const idleName = config.idle_sprite || "";
-  const names = Object.keys(sprites);
-
-  // Cheap diff so we don't rebuild gallery on every 1.5s poll
-  const hash = JSON.stringify({ k: names, i: idleName });
-  if (hash === lastSpriteConfigHash) return;
-  lastSpriteConfigHash = hash;
-
-  // Stop existing animations
-  for (const [, id] of spriteTimers) clearInterval(id);
-  spriteTimers.clear();
-
-  const hint = $("#sprite-hint");
-  const gallery = $("#sprite-gallery");
-
-  if (!names.length) {
-    hint.textContent = "// vault empty · upload a sprite below to see it here";
-    gallery.innerHTML = "";
-    return;
-  }
-  hint.textContent = idleName
-    ? `// ${names.length} sprite${names.length > 1 ? "s" : ""} · idle = "${idleName}"`
-    : `// ${names.length} sprite${names.length > 1 ? "s" : ""} · idle = breathing dots (none assigned)`;
-
-  gallery.innerHTML = names.map((n) => spriteCardHtml(n, idleName === n, sprites[n].frames || [])).join("");
-
-  // Paint canvases + start animations
-  for (const name of names) {
-    const frames = sprites[name].frames || [];
-    const cv = gallery.querySelector(`canvas[data-name="${cssAttr(name)}"]`);
-    if (!cv || !frames.length) continue;
-    const decoded = frames.map((f) => decodeSpriteFrame(f.pal || "", f.px || "", f.w || 32, f.h || 32)).filter(Boolean);
-    if (!decoded.length) continue;
-    cv.width = decoded[0].w;
-    cv.height = decoded[0].h;
-    const ctx = cv.getContext("2d");
-    ctx.imageSmoothingEnabled = false;
-    let idx = 0;
-    const draw = () => {
-      const f = decoded[idx % decoded.length];
-      ctx.putImageData(f.image, 0, 0);
-      idx++;
-    };
-    draw();
-    if (decoded.length > 1) {
-      const id = setInterval(draw, 200);
-      spriteTimers.set(name, id);
-    }
-  }
-
-  // Wire actions
-  gallery.querySelectorAll(".sprite-action").forEach((el) => {
-    el.addEventListener("click", () => {
-      const op = el.dataset.op;
-      const name = el.dataset.name;
-      if (op === "idle")   setIdleSprite(name);
-      if (op === "test")   testSprite(name);
-      if (op === "delete") deleteSprite(name);
-    });
-  });
-}
-
-function spriteCardHtml(name, isIdle, frames) {
-  const fc = frames.length;
-  const w = frames[0]?.w || 32;
-  const h = frames[0]?.h || 32;
-  const badge = isIdle ? '<span class="sprite-badge mono">IDLE</span>' : "";
-  return `
-    <article class="sprite-card${isIdle ? " is-idle" : ""}">
-      <div class="sprite-preview">
-        <canvas data-name="${escapeAttr(name)}"></canvas>
-      </div>
-      <div class="sprite-meta">
-        <div class="sprite-name">${escapeHtml(name)}${badge}</div>
-        <div class="sprite-stats mono dim">${fc} frame${fc !== 1 ? "s" : ""} · ${w}×${h}</div>
-      </div>
-      <div class="sprite-actions">
-        <button class="btn sprite-action" data-op="idle"   data-name="${escapeAttr(name)}">Set idle</button>
-        <button class="btn sprite-action" data-op="test"   data-name="${escapeAttr(name)}">Test</button>
-        <button class="btn sprite-action sprite-action-danger" data-op="delete" data-name="${escapeAttr(name)}">×</button>
-      </div>
-    </article>
-  `;
-}
-
-// 4bpp + 16-color RGB565 palette → ImageData (RGBA)
-function decodeSpriteFrame(palHex, pxHex, w, h) {
-  if (!palHex || !pxHex) return null;
-  const pal = hexToBytes(palHex);
-  const px  = hexToBytes(pxHex);
-  if (pal.length < 32 || px.length < (w * h) / 2) return null;
-  // Decode 16-entry palette from big-endian RGB565 → RGBA888
-  const palRgba = new Uint8ClampedArray(16 * 4);
-  for (let i = 0; i < 16; i++) {
-    const rgb565 = (pal[i * 2] << 8) | pal[i * 2 + 1];
-    const r = ((rgb565 >> 11) & 0x1f) * 255 / 31 | 0;
-    const g = ((rgb565 >> 5)  & 0x3f) * 255 / 63 | 0;
-    const b = ( rgb565        & 0x1f) * 255 / 31 | 0;
-    palRgba[i * 4 + 0] = r;
-    palRgba[i * 4 + 1] = g;
-    palRgba[i * 4 + 2] = b;
-    palRgba[i * 4 + 3] = 255;
-  }
-  const out = new Uint8ClampedArray(w * h * 4);
-  for (let i = 0; i < w * h; i++) {
-    const byte   = px[i >> 1];
-    const nibble = (i & 1) === 0 ? (byte >> 4) : (byte & 0x0f);
-    const p = nibble * 4;
-    const o = i * 4;
-    out[o + 0] = palRgba[p + 0];
-    out[o + 1] = palRgba[p + 1];
-    out[o + 2] = palRgba[p + 2];
-    out[o + 3] = palRgba[p + 3];
-  }
-  return { w, h, image: new ImageData(out, w, h) };
-}
-
-function hexToBytes(hex) {
-  const clean = String(hex || "").replace(/\s+/g, "");
-  const out = new Uint8Array(clean.length >> 1);
-  for (let i = 0; i < out.length; i++) {
-    out[i] = parseInt(clean.substr(i * 2, 2), 16);
-  }
-  return out;
-}
-
-function cssAttr(s) {
-  // CSS attribute selector escape for sprite names (allow safe chars only)
-  return String(s).replace(/[^a-zA-Z0-9_-]/g, "_");
-}
-
-async function setIdleSprite(name) {
-  try {
-    const r = await fetch(`/api/sprite/${encodeURIComponent(name)}/idle`, { method: "POST" });
-    const d = await r.json();
-    setResult($("#sprite-result"), d.ok ? `'${name}' set as idle` : "Error: " + (d.error || ""), d.ok ? "ok" : "err");
-    if (d.ok) lastSpriteConfigHash = ""; // force re-render
-  } catch (e) {
-    setResult($("#sprite-result"), "Failed: " + e.message, "err");
-  }
-}
-
-async function testSprite(name) {
-  try {
-    const r = await fetch(`/api/sprite/${encodeURIComponent(name)}/test`, { method: "POST" });
-    const d = await r.json();
-    setResult($("#sprite-result"), d.ok ? `'${name}' test-fired` : "Error", d.ok ? "ok" : "err");
-  } catch (e) {
-    setResult($("#sprite-result"), "Failed: " + e.message, "err");
-  }
-}
-
-async function deleteSprite(name) {
-  if (!confirm(`Delete sprite '${name}' permanently?`)) return;
-  try {
-    const r = await fetch(`/api/sprite/${encodeURIComponent(name)}`, { method: "DELETE" });
-    const d = await r.json();
-    setResult($("#sprite-result"), d.ok ? `'${name}' deleted` : "Error", d.ok ? "ok" : "err");
-    if (d.ok) lastSpriteConfigHash = "";
-  } catch (e) {
-    setResult($("#sprite-result"), "Failed: " + e.message, "err");
-  }
-}
-
-/* ─── ESCAPING ─────────────────────────────────────────────────────────────── */
+/* ─── ESCAPING ───────────────────────────────────────────────────────────────── */
 function escapeHtml(s) {
   return String(s ?? "")
     .replace(/&/g, "&amp;")
@@ -517,5 +524,5 @@ function escapeHtml(s) {
 }
 function escapeAttr(s) { return escapeHtml(s).replace(/\n/g, " "); }
 
-/* ─── START ────────────────────────────────────────────────────────────────── */
+/* ─── START ─────────────────────────────────────────────────────────────────── */
 document.addEventListener("DOMContentLoaded", boot);
